@@ -24,8 +24,8 @@ pipeline {
               dir('src/') {
                 withSonarQubeEnv('sonar-server') {
                     sh ''' $SSHOME/bin/sonar-scanner \
-                    -Dsonar.projectKey=villa-villa-agency-project \
-                    -Dsonar.projectName=villa-villa-agency-project '''  
+                    -Dsonar.projectKey=villa-villa-agency-project01 \
+                    -Dsonar.projectName=villa-villa-agency-project01 '''  
                 }
               }
             }
