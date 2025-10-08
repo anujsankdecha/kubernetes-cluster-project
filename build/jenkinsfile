@@ -15,7 +15,7 @@ pipeline {
     stages {
         stage("App code Checkout"){
             steps {
-                git branch: 'kubernetes', url:'https://github.com/anujsankdecha/kubernetes-cluster-project.git'
+                git branch: 'main', url:'https://github.com/anujsankdecha/kubernetes-cluster-project.git'
             }
         }
 
