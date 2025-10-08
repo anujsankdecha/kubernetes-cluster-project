@@ -9,61 +9,87 @@ pipeline {
 
     environment {
         SSHOME = tool 'sonar-scanner'
-        DOKCER_REGISTRY_CREDS = credentials('docker-creds')
+        DOCKER_REGISTRY_CREDS = credentials('docker-creds')
     }
 
     stages {
-        stage("App code Checkout"){
+        stage("App code Checkout") {
             steps {
-                git branch: 'main', url:'https://github.com/anujsankdecha/kubernetes-cluster-project.git'
+                git branch: 'main', url: 'https://github.com/anujsankdecha/kubernetes-cluster-project.git'
             }
         }
 
-        stage("Sonar Analysis"){
-            steps{
-              dir('src/') {
-                withSonarQubeEnv('sonar-server') {
-                    sh ''' $SSHOME/bin/sonar-scanner \
-                    -Dsonar.projectKey=villa-villa-agency-project01 \
-                    -Dsonar.projectName=villa-villa-agency-project01 '''  
+        stage("Sonar Analysis") {
+            steps {
+                dir('src/') {
+                    withSonarQubeEnv('sonar-server') {
+                        sh """ 
+                            $SSHOME/bin/sonar-scanner \
+                            -Dsonar.projectKey=villa-villa-agency-project01 \
+                            -Dsonar.projectName=villa-villa-agency-project01 \
+                            -Dsonar.sources=. \
+                            -Dsonar.host.url=\${SONAR_HOST_URL} \
+                            -Dsonar.login=\${SONAR_AUTH_TOKEN}
+                        """  
+                    }
                 }
-              }
             }
         }
 
         stage('QualityGate') {
             steps {
-                script {
-                    dir('src/') {
-                        waitForQualityGate abortPipeline: false, credentialsId: 'sonar-token' 
-                    }
+                timeout(time: 5, unit: 'MINUTES') {
+                    waitForQualityGate abortPipeline: true
                 }
             }
         }
-        stage("Scan CODEFS"){
-            steps{
-                sh "trivy fs src/ >> /tmp/trivyscanfs.txt "
-            }
-        }
-        stage("build Image"){
-            steps{
-                sh "docker build -t anujsankdecha/villaimage:${BUILD_NUMBER} ."
-            }
-        }
 
-        stage("Scan Image Trivy"){
-            steps{
-                sh "trivy image anujsankdecha/villaimage:${BUILD_NUMBER} >> /tmp/trivyscan.txt "
-            }
-        }
-
-        stage("Image Push to Registry"){
+        stage("Scan CODEFS") {
             steps {
-                sh "docker tag villaimage:${BUILD_NUMBER} anujsankdecha/villaimage:${BUILD_NUMBER} "
-                sh " docker login -u $DOKCER_REGISTRY_CREDS_USR -p $DOKCER_REGISTRY_CREDS_PSW "
-                sh " docker push anujsankdecha/villaimage:${BUILD_NUMBER} "
-                sh " docker image rm -f anujsankdecha/villaimage:${BUILD_NUMBER} "
+                sh "trivy fs --exit-code 0 src/ > /tmp/trivyscanfs-${BUILD_NUMBER}.txt 2>&1 || true"
+                sh "cat /tmp/trivyscanfs-${BUILD_NUMBER}.txt"
             }
+        }
+
+        stage("Build Image") {
+            steps {
+                script {
+                    // Check if Dockerfile exists
+                    sh "ls -la Dockerfile || echo 'Dockerfile not found'"
+                    sh "docker build -t anujsankdecha/villaimage:${BUILD_NUMBER} ."
+                }
+            }
+        }
+
+        stage("Scan Image Trivy") {
+            steps {
+                sh "trivy image --exit-code 0 anujsankdecha/villaimage:${BUILD_NUMBER} > /tmp/trivyscan-${BUILD_NUMBER}.txt 2>&1 || true"
+                sh "cat /tmp/trivyscan-${BUILD_NUMBER}.txt"
+            }
+        }
+
+        stage("Image Push to Registry") {
+            steps {
+                script {
+                    sh "docker login -u $DOCKER_REGISTRY_CREDS_USR -p $DOCKER_REGISTRY_CREDS_PSW"
+                    sh "docker push anujsankdecha/villaimage:${BUILD_NUMBER}"
+                    sh "docker rmi anujsankdecha/villaimage:${BUILD_NUMBER}"
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            echo "Pipeline completed - Build ${BUILD_NUMBER}"
+            // Cleanup trivy scan files
+            sh "rm -f /tmp/trivyscan*.txt || true"
+        }
+        success {
+            echo "Pipeline succeeded!"
+        }
+        failure {
+            echo "Pipeline failed!"
         }
     }
 }

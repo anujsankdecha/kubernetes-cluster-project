@@ -1,0 +1,69 @@
+pipeline {
+    agent {
+        label 'giant-machine'
+    }
+    options {
+        timeout(time: 1, unit: 'HOURS')
+        buildDiscarder(logRotator(numToKeepStr: '3'))
+    }
+
+    environment {
+        SSHOME = tool 'sonar-scanner'
+        DOKCER_REGISTRY_CREDS = credentials('docker-creds')
+    }
+
+    stages {
+        stage("App code Checkout"){
+            steps {
+                git branch: 'main', url:'https://github.com/anujsankdecha/kubernetes-cluster-project.git'
+            }
+        }
+
+        stage("Sonar Analysis"){
+            steps{
+              dir('src/') {
+                withSonarQubeEnv('sonar-server') {
+                    sh ''' $SSHOME/bin/sonar-scanner \
+                    -Dsonar.projectKey=villa-villa-agency-project01 \
+                    -Dsonar.projectName=villa-villa-agency-project01 '''  
+                }
+              }
+            }
+        }
+
+        stage('QualityGate') {
+            steps {
+                script {
+                    dir('src/') {
+                        waitForQualityGate abortPipeline: false, credentialsId: 'sonar-token' 
+                    }
+                }
+            }
+        }
+        stage("Scan CODEFS"){
+            steps{
+                sh "trivy fs src/ >> /tmp/trivyscanfs.txt "
+            }
+        }
+        stage("build Image"){
+            steps{
+                sh "docker build -t anujsankdecha/villaimage:${BUILD_NUMBER} ."
+            }
+        }
+
+        stage("Scan Image Trivy"){
+            steps{
+                sh "trivy image anujsankdecha/villaimage:${BUILD_NUMBER} >> /tmp/trivyscan.txt "
+            }
+        }
+
+        stage("Image Push to Registry"){
+            steps {
+                sh "docker tag villaimage:${BUILD_NUMBER} anujsankdecha/villaimage:${BUILD_NUMBER} "
+                sh " docker login -u $DOKCER_REGISTRY_CREDS_USR -p $DOKCER_REGISTRY_CREDS_PSW "
+                sh " docker push anujsankdecha/villaimage:${BUILD_NUMBER} "
+                sh " docker image rm -f anujsankdecha/villaimage:${BUILD_NUMBER} "
+            }
+        }
+    }
+}
