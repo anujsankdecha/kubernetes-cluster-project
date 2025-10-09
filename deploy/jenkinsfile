@@ -11,9 +11,9 @@ pipeline {
         KUBECONFIG = "${WORKSPACE}/kubeconfig"
     }
     stages {
-        stage("App code Checkout"){
+        stage("App code Checkout") {
             steps {
-                git branch: 'main', url:'https://github.com/anujsankdecha/kubernetes-cluster-project.git'
+                git branch: 'main', url: 'https://github.com/anujsankdecha/kubernetes-cluster-project.git'
             }
         }
 
@@ -21,8 +21,14 @@ pipeline {
             steps {
                 withCredentials([file(credentialsId: 'kube-config', variable: 'KUBECONFIG_FILE')]) {
                     sh '''
+                      # Copy kubeconfig to workspace
                       cp $KUBECONFIG_FILE $KUBECONFIG
                       chmod 600 $KUBECONFIG
+
+                      # Update kubeconfig to point to correct master IP
+                      sed -i 's/192.168.0.100/192.168.0.50/g' $KUBECONFIG
+
+                      # Apply Kubernetes manifests
                       kubectl apply -f kubernetes-deploy/namespace.yaml
                       kubectl apply -f kubernetes-deploy/deployment.yaml
                       kubectl apply -f kubernetes-deploy/service.yaml
@@ -31,4 +37,4 @@ pipeline {
             }
         }
     }
-}            
+}
