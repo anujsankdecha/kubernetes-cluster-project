@@ -25,8 +25,12 @@ pipeline {
                       cp $KUBECONFIG_FILE $KUBECONFIG
                       chmod 600 $KUBECONFIG
 
-                      # Explicitly set Kubernetes master IP in kubeconfig
-                      kubectl config set-cluster kubernetes --server=https://192.168.0.50:6443 --kubeconfig=$KUBECONFIG
+                      # Explicitly set Kubernetes master IP and skip TLS verification
+                      kubectl config set-cluster kubernetes \
+                        --server=https://192.168.0.50:6443 \
+                        --insecure-skip-tls-verify=true \
+                        --kubeconfig=$KUBECONFIG
+
                       kubectl config set-context --current --cluster=kubernetes --kubeconfig=$KUBECONFIG
 
                       # Test connection to the cluster
