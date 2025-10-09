@@ -7,7 +7,7 @@ pipeline {
         buildDiscarder(logRotator(numToKeepStr: '3'))
     }
     environment {
-        // Path to the kubeconfig file
+        // Path to the kubeconfig file in workspace
         KUBECONFIG = "${WORKSPACE}/kubeconfig"
     }
     stages {
@@ -21,12 +21,16 @@ pipeline {
             steps {
                 withCredentials([file(credentialsId: 'kube-config', variable: 'KUBECONFIG_FILE')]) {
                     sh '''
-                      # Copy kubeconfig to workspace
+                      # Copy kubeconfig from credentials to workspace
                       cp $KUBECONFIG_FILE $KUBECONFIG
                       chmod 600 $KUBECONFIG
 
-                      # Update kubeconfig to point to correct master IP
-                      sed -i 's/192.168.0.100/192.168.0.50/g' $KUBECONFIG
+                      # Explicitly set Kubernetes master IP in kubeconfig
+                      kubectl config set-cluster kubernetes --server=https://192.168.0.50:6443 --kubeconfig=$KUBECONFIG
+                      kubectl config set-context --current --cluster=kubernetes --kubeconfig=$KUBECONFIG
+
+                      # Test connection to the cluster
+                      kubectl get nodes --kubeconfig=$KUBECONFIG
 
                       # Apply Kubernetes manifests
                       kubectl apply -f kubernetes-deploy/namespace.yaml
