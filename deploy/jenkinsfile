@@ -7,13 +7,13 @@ pipeline {
         buildDiscarder(logRotator(numToKeepStr: '3'))
     }
     environment {
-        // Path to the kubeconfig file in workspace
+        // Path to the kubeconfig file
         KUBECONFIG = "${WORKSPACE}/kubeconfig"
     }
     stages {
-        stage("App code Checkout") {
+        stage("App code Checkout"){
             steps {
-                git branch: 'main', url: 'https://github.com/anujsankdecha/kubernetes-cluster-project.git'
+                git branch: 'main', url:'https://github.com/anujsankdecha/kubernetes-cluster-project.git'
             }
         }
 
@@ -21,22 +21,8 @@ pipeline {
             steps {
                 withCredentials([file(credentialsId: 'kube-config', variable: 'KUBECONFIG_FILE')]) {
                     sh '''
-                      # Copy kubeconfig from credentials to workspace
                       cp $KUBECONFIG_FILE $KUBECONFIG
                       chmod 600 $KUBECONFIG
-
-                      # Explicitly set Kubernetes master IP and skip TLS verification
-                      kubectl config set-cluster kubernetes \
-                        --server=https://192.168.0.50:6443 \
-                        --insecure-skip-tls-verify=true \
-                        --kubeconfig=$KUBECONFIG
-
-                      kubectl config set-context --current --cluster=kubernetes --kubeconfig=$KUBECONFIG
-
-                      # Test connection to the cluster
-                      kubectl get nodes --kubeconfig=$KUBECONFIG
-
-                      # Apply Kubernetes manifests
                       kubectl apply -f kubernetes-deploy/namespace.yaml
                       kubectl apply -f kubernetes-deploy/deployment.yaml
                       kubectl apply -f kubernetes-deploy/service.yaml
@@ -45,4 +31,4 @@ pipeline {
             }
         }
     }
-}
+}            
