@@ -1,6 +1,6 @@
 pipeline {
     agent {
-        label 'jenkins-slave'
+        label 'jenkins-agent'
     }
     options {
         timeout(time: 1, unit: 'HOURS')
@@ -25,8 +25,8 @@ pipeline {
                     withSonarQubeEnv('sonar-server') {
                         sh """ 
                             $SSHOME/bin/sonar-scanner \
-                            -Dsonar.projectKey=villa-villa-agency-project01 \
-                            -Dsonar.projectName=villa-villa-agency-project01 \
+                            -Dsonar.projectKey=villa-agency-project-ci \
+                            -Dsonar.projectName=villa-agency-project-ci \
                             -Dsonar.sources=. \
                             -Dsonar.host.url=\${SONAR_HOST_URL} \
                             -Dsonar.login=\${SONAR_AUTH_TOKEN}
