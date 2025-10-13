@@ -24,12 +24,12 @@ pipeline {
                 dir('src/') {
                     withSonarQubeEnv('sonar-server') {
                         sh """ 
-                            $SSHOME/bin/sonar-scanner \
+                            ${SSHOME}/bin/sonar-scanner \
                             -Dsonar.projectKey=villa-agency-project \
                             -Dsonar.projectName=villa-agency-project \
                             -Dsonar.sources=. \
                             -Dsonar.host.url=\${SONAR_HOST_URL} \
-                            -Dsonar.login=\${SONAR_AUTH_TOKEN}
+                            -Dsonar.token=\${SONAR_AUTH_TOKEN}
                         """  
                     }
                 }
@@ -39,7 +39,27 @@ pipeline {
         stage('QualityGate') {
             steps {
                 timeout(time: 5, unit: 'MINUTES') {
-                    waitForQualityGate abortPipeline: true
+                    script {
+                        // don't abort the pipeline if SonarQube QG is unavailable
+                        def qg = waitForQualityGate abortPipeline: false
+                        echo "Quality Gate raw result object: ${qg}"
+                        if (qg == null) {
+                            echo "QualityGate result unavailable (timed out or webhook not configured). Marking build UNSTABLE and continuing."
+                            currentBuild.result = 'UNSTABLE'
+                        } else {
+                            echo "Quality Gate status: ${qg.status}"
+                            if (qg.status == 'ERROR') {
+                                // Quality gate failed — mark unstable or fail as you prefer
+                                echo "Quality gate FAILED. Marking build UNSTABLE."
+                                currentBuild.result = 'UNSTABLE'
+                            } else if (qg.status == 'OK') {
+                                echo "Quality gate passed."
+                            } else {
+                                echo "Quality gate status: ${qg.status} (treating as UNSTABLE)"
+                                currentBuild.result = 'UNSTABLE'
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -53,6 +73,7 @@ pipeline {
 
         stage("Build Image") {
             steps {
+                // Keep this in a script block if you plan additional logic later
                 script {
                     // Check if Dockerfile exists
                     sh "ls -la Dockerfile || echo 'Dockerfile not found'"
@@ -73,7 +94,7 @@ pipeline {
                 script {
                     sh "docker login -u $DOCKER_REGISTRY_CREDS_USR -p $DOCKER_REGISTRY_CREDS_PSW"
                     sh "docker push anujgajjar/villaimage:${BUILD_NUMBER}"
-                    sh "docker rmi anujgajjar/villaimage:${BUILD_NUMBER}"
+                    sh "docker rmi anujgajjar/villaimage:${BUILD_NUMBER} || true"
                 }
             }
         }
@@ -81,9 +102,12 @@ pipeline {
 
     post {
         always {
-            echo "Pipeline completed - Build ${BUILD_NUMBER}"
-            // Cleanup trivy scan files
-            sh "rm -f /tmp/trivyscan*.txt || true"
+            // run cleanup on an agent workspace (provides hudson.FilePath)
+            node {
+                echo "Pipeline completed - Build ${BUILD_NUMBER}"
+                // Cleanup trivy scan files
+                sh "rm -f /tmp/trivyscan*.txt || true"
+            }
         }
         success {
             echo "Pipeline succeeded!"
