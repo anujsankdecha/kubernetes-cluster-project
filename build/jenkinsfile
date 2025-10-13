@@ -101,14 +101,13 @@ pipeline {
     }
 
     post {
-        always {
-            // run cleanup on an agent workspace (provides hudson.FilePath)
-            node {
-                echo "Pipeline completed - Build ${BUILD_NUMBER}"
-                // Cleanup trivy scan files
-                sh "rm -f /tmp/trivyscan*.txt || true"
-            }
+    always {
+        node('jenkins-agent') {
+            echo "Pipeline completed - Build ${BUILD_NUMBER}"
+            sh "rm -f /tmp/trivyscan*.txt || true"
         }
+    }
+
         success {
             echo "Pipeline succeeded!"
         }
