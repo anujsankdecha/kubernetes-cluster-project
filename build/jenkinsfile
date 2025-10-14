@@ -81,20 +81,4 @@ pipeline {
             }
         }
     }
-
-    post {
-    always {
-        node('jenkins-agent') {
-            echo "Pipeline completed - Build ${BUILD_NUMBER}"
-            sh "rm -f /tmp/trivyscan*.txt || true"
-        }
-    }
-
-        success {
-            echo "Pipeline succeeded!"
-        }
-        failure {
-            echo "Pipeline failed!"
-        }
-    }
 }
