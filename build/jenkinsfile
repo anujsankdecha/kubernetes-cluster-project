@@ -38,27 +38,9 @@ pipeline {
 
         stage('QualityGate') {
             steps {
-                timeout(time: 5, unit: 'MINUTES') {
-                    script {
-                        // don't abort the pipeline if SonarQube QG is unavailable
-                        def qg = waitForQualityGate abortPipeline: false
-                        echo "Quality Gate raw result object: ${qg}"
-                        if (qg == null) {
-                            echo "QualityGate result unavailable (timed out or webhook not configured). Marking build UNSTABLE and continuing."
-                            currentBuild.result = 'UNSTABLE'
-                        } else {
-                            echo "Quality Gate status: ${qg.status}"
-                            if (qg.status == 'ERROR') {
-                                // Quality gate failed — mark unstable or fail as you prefer
-                                echo "Quality gate FAILED. Marking build UNSTABLE."
-                                currentBuild.result = 'UNSTABLE'
-                            } else if (qg.status == 'OK') {
-                                echo "Quality gate passed."
-                            } else {
-                                echo "Quality gate status: ${qg.status} (treating as UNSTABLE)"
-                                currentBuild.result = 'UNSTABLE'
-                            }
-                        }
+                script {
+                    dir('src/') {
+                        waitForQualityGate abortPipeline: false, credentialsId: 'sonar-token' 
                     }
                 }
             }
